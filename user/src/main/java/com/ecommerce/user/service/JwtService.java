@@ -22,7 +22,7 @@ public class JwtService {
     private final SecretKey key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
 
     // 1 hour
-    private static final long ACCESS_TOKEN_SECONDS = 3600;
+    private static final long ACCESS_TOKEN_SECONDS = 36000;
 
     public String generateAccessToken(Long userId, String email, String role) {
         Instant now = Instant.now();
