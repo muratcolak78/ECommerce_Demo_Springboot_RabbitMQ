@@ -2,6 +2,8 @@
 
 ![E-Commerce Microservices Demo](https://github.com/user-attachments/assets/15b94c8a-0c79-4a97-a6ff-aa4d005b0fd6)
 
+![Uploading cartadded.gif…]()
+
 
 Projektübersicht
 
