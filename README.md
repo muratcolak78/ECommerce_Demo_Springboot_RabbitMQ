@@ -1,9 +1,14 @@
  E-Commerce Microservices Demo (Java Spring Boot + SQLite + JWT)
+ 
 
 ![E-Commerce Microservices Demo](https://github.com/user-attachments/assets/15b94c8a-0c79-4a97-a6ff-aa4d005b0fd6)
 
+cart service added 
 
 ![cartadded](https://github.com/user-attachments/assets/3ccc62d1-7f28-4e8d-9d31-916a29ab4c43)
+
+order service added
+
 
 
 Projektübersicht
