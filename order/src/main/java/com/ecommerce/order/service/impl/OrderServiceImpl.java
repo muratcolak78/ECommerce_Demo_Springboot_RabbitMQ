@@ -1,10 +1,17 @@
 package com.ecommerce.order.service.impl;
 
 import com.ecommerce.order.model.*;
+import com.ecommerce.order.model.dto.CartItemDto;
+import com.ecommerce.order.model.dto.OrderItemResponseDto;
+import com.ecommerce.order.model.dto.OrderResponseDto;
+import com.ecommerce.order.model.enums.EventStatus;
+import com.ecommerce.order.model.enums.Status;
 import com.ecommerce.order.repository.OrderItemRepository;
 import com.ecommerce.order.repository.OrderRepository;
 import com.ecommerce.order.kafka.OrderEventProducer;
 import com.ecommerce.order.service.OrderService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +27,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderItemRepository itemRepository;
     private final WebClient webClient;
     private final OrderEventProducer producer;
+    private final static Logger LOGGER= LoggerFactory.getLogger(OrderServiceImpl.class);
 
     @Value("${cart.service.url}")
     private String CART_SERVICE_URL;
@@ -60,18 +68,18 @@ public class OrderServiceImpl implements OrderService {
             itemRepository.save(orderItem);
         }
         /// create order_event to send kafka order_saved topic
-        OrderSavedEvent event=new OrderSavedEvent();
+        OrderCreatedEvent event=new OrderCreatedEvent();
         event.setOrderId(savedOrder.getId());
         event.setUserId(savedOrder.getUserId());
         event.setStatus(savedOrder.getStatus());
         event.setTotalAmount(savedOrder.getTotalAmount());
 
         /// send event
-        producer.publishOrderSaved(event);
+       /// producer.publishOrderSaved(event);
 
         /// Clear Cart
         clearCart(header);
-
+        LOGGER.info(String.format("order saved -> %s",order));
         return savedOrder.getId();
 
     }
@@ -112,6 +120,37 @@ public class OrderServiceImpl implements OrderService {
         }
 
         return dtoList;
+    }
+
+    @Override
+    @Transactional
+    public void updateStatus(PaymentEvent paymentEvent) {
+        LOGGER.info(String.format("Message received from kafka topic ->%s", paymentEvent));
+        Order order=orderRepository.findById(paymentEvent.getOrderId())
+                .orElseThrow(()->new IllegalStateException("Order not found"));
+
+        if (order.getStatus()!=Status.CREATED) return;
+
+        LOGGER.info(String.format("order status -> %s %s",order.getUserId(), order.getStatus().name()));
+        if(paymentEvent.getStatus()==EventStatus.PAID){
+            order.setStatus(Status.PAID);
+        }else if(paymentEvent.getStatus()==EventStatus.FAILED){
+            order.setStatus(Status.FAILED);
+        }
+
+
+        orderRepository.save(order);
+        LOGGER.info(String.format("order status updated -> %s %s",order.getUserId(),order.getStatus().name()));
+
+
+    }
+
+    @Override
+    public BigDecimal getAmount(Long userId, Long orderId) {
+        Order order=orderRepository.findByIdAndUserId(orderId,userId)
+                .orElseThrow(()->new IllegalStateException("Order not found"));
+
+        return order.getTotalAmount();
     }
 
     private void clearCart(String authHeader) {

@@ -1,13 +1,13 @@
 package com.ecommerce.order.controller;
 
 import com.ecommerce.order.model.OrderItem;
-import com.ecommerce.order.model.OrderItemResponseDto;
-import com.ecommerce.order.model.OrderResponseDto;
+import com.ecommerce.order.model.dto.OrderResponseDto;
 import com.ecommerce.order.service.OrderService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -42,5 +42,14 @@ public class OrderController {
         Long userId=Long.valueOf(authentication.getName());
         List<OrderResponseDto> orderlist= service.getOrders(userId);
         return ResponseEntity.ok(orderlist);
+    }
+
+    ///  this endpoint work only, if payment service call for a totalAomunt of any order
+    @GetMapping("/getamount")
+    public BigDecimal getAmount(Authentication authentication,
+                                @RequestParam Long orderId) {
+        Long userId = Long.valueOf(authentication.getName());
+        BigDecimal totalAmount = service.getAmount(userId, orderId);
+        return totalAmount;
     }
 }

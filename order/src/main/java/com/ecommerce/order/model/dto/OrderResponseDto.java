@@ -1,5 +1,6 @@
-package com.ecommerce.order.model;
+package com.ecommerce.order.model.dto;
 
+import com.ecommerce.order.model.enums.Status;
 import lombok.Getter;
 import lombok.Setter;
 

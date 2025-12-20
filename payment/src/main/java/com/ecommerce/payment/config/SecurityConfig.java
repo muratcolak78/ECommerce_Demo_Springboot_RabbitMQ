@@ -1,6 +1,6 @@
-package com.ecommerce.order.config;
+package com.ecommerce.payment.config;
 
-import com.ecommerce.order.auth.JwtAuthFilter;
+import com.ecommerce.payment.auth.JwtAuthFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -30,16 +30,13 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
                         // ✅ ORDER endpoints must be protected
-                        .requestMatchers("/api/ecommerce/order/**").authenticated()
+                        .requestMatchers("/api/ecommerce/payment/**").authenticated()
 
                         // (opsiyonel) actuator vs varsa açarsın
                         .anyRequest().permitAll()
                 )
                 .build();
     }
-    @Bean
-    public JwtAuthFilter jwtAuthFilter() {
-        return new JwtAuthFilter();
-    }
+
 
 }

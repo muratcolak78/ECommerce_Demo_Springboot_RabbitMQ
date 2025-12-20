@@ -1,5 +1,6 @@
 package com.ecommerce.order.model;
 
+import com.ecommerce.order.model.enums.Status;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -9,9 +10,9 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 @NoArgsConstructor
 @ToString
-public class OrderSavedEvent {
+public class OrderCreatedEvent {
     private Long orderId;
     private Long userId;
-    private Status status; // veya Status
+    private Status status;
     private BigDecimal totalAmount;
 }

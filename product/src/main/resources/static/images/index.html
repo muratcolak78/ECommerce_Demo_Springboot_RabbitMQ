@@ -362,15 +362,62 @@
     </div>
 </dialog>
 
+<dialog id="paymentDialog">
+    <div style="padding:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+            <div style="font-weight:800; font-size:18px;">Payment</div>
+            <button class="close" id="paymentClose">Close</button>
+        </div>
+
+        <div class="pill" style="margin-top:10px;">
+            Order: <b id="payOrderId">-</b> · Total: <b id="payTotal">-</b>
+        </div>
+
+        <div style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap;">
+            <label class="pill" style="cursor:pointer;">
+                <input type="radio" name="payMethod" value="PAYPAL" />
+                PayPal
+            </label>
+
+            <label class="pill" style="cursor:pointer;">
+                <input type="radio" name="payMethod" value="CREDIT_CARD" />
+                Credit Card
+            </label>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:14px; align-items:center;">
+            <button id="payNowBtn" class="btn accent" disabled>Pay now</button>
+            <span id="paySpinner" class="pill" style="display:none;">Processing payment (demo)…</span>
+        </div>
+
+        <div id="paymentMsg" class="pill" style="margin-top:12px; display:none;"></div>
+    </div>
+</dialog>
+<dialog id="resultDialog">
+    <div style="padding:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+            <div style="font-weight:800; font-size:18px;" id="resultTitle">Result</div>
+            <button class="close" id="resultClose">Close</button>
+        </div>
+
+        <div class="pill" style="margin-top:10px;">
+            <span id="resultText">-</span>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:14px;">
+            <button id="resultOk" class="btn accent">OK</button>
+        </div>
+    </div>
+</dialog>
+
 
 <script>
     // =========================
-    // ✅ CONFIG (change here)
+    // ✅ CONFIG
     // =========================
     const GATEWAY = "http://localhost:8080";
 
-
-    // User/Auth Service (your controller: /api/ecommerce/user)
+    // User/Auth Service
     const USER_API_BASE = `${GATEWAY}/api/ecommerce/user`;
     const REGISTER_ENDPOINT = `${USER_API_BASE}/register`;
     const LOGIN_ENDPOINT    = `${USER_API_BASE}/login`;
@@ -390,23 +437,13 @@
     const ORDER_LIST_ENDPOINT = `${ORDER_API_BASE}/orders`;
     const ORDER_DETAIL_ENDPOINT = (orderId) => `${ORDER_API_BASE}/order/${orderId}`;
 
-   // Product Service:
+    // Product Service
     const PRODUCT_API_BASE = `${GATEWAY}`;
     const PRODUCT_LIST_ENDPOINT = `${PRODUCT_API_BASE}/api/product`;
 
-
-    function setUser(user) {
-      localStorage.setItem(USER_KEY, JSON.stringify(user));
-    }
-
-    function getUser() {
-      const u = localStorage.getItem(USER_KEY);
-      return u ? JSON.parse(u) : null;
-    }
-
-    function clearUser() {
-      localStorage.removeItem(USER_KEY);
-    }
+    // Payment Service
+    const PAYMENT_API_BASE = `${GATEWAY}/api/ecommerce/payment`;
+    const PAYMENT_START_ENDPOINT = `${PAYMENT_API_BASE}/start`;
 
     // =========================
     // Token storage
@@ -415,6 +452,35 @@
     const getToken  = () => localStorage.getItem(TOKEN_KEY);
     const setToken  = (t) => localStorage.setItem(TOKEN_KEY, t);
     const clearToken = () => localStorage.removeItem(TOKEN_KEY);
+
+    function setUser(user) { localStorage.setItem(USER_KEY, JSON.stringify(user)); }
+    function getUser() {
+      const u = localStorage.getItem(USER_KEY);
+      return u ? JSON.parse(u) : null;
+    }
+    function clearUser() { localStorage.removeItem(USER_KEY); }
+
+    // =========================
+    // Helpers
+    // =========================
+    let allProducts = [];
+    let categories = [];
+
+    const fmtPrice = (value) => {
+      try {
+        return new Intl.NumberFormat("de-DE", { style:"currency", currency:"EUR" }).format(Number(value));
+      } catch {
+        return `${value} €`;
+      }
+    };
+
+    const safeText = (v, fallback="") => (v === null || v === undefined || v === "") ? fallback : String(v);
+
+    function buildImageUrl(imageUrl) {
+      if (!imageUrl) return "";
+      if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) return imageUrl;
+      return `${PRODUCT_API_BASE}${imageUrl}`;
+    }
 
     // =========================
     // UI elements
@@ -458,29 +524,45 @@
     const lPassword = document.getElementById("lPassword");
     const loginBtn = document.getElementById("loginBtn");
 
+    // Cart UI
+    const openCart = document.getElementById("openCart");
+    const cartDialog = document.getElementById("cartDialog");
+    const cartClose = document.getElementById("cartClose");
+    const cartList = document.getElementById("cartList");
+    const cartCount = document.getElementById("cartCount");
+    const clearCartBtn = document.getElementById("clearCartBtn");
+    const cartTotal = document.getElementById("cartTotal");
+    const cartMsg = document.getElementById("cartMsg");
+    const checkoutBtn = document.getElementById("checkoutBtn");
+
+    // Orders UI
+    const openOrders = document.getElementById("openOrders");
+    const ordersDialog = document.getElementById("ordersDialog");
+    const ordersClose = document.getElementById("ordersClose");
+    const ordersList = document.getElementById("ordersList");
+    const ordersMsg = document.getElementById("ordersMsg");
+    const ordersCount = document.getElementById("ordersCount");
+
+    // Payment UI (dialog)
+    const paymentDialog = document.getElementById("paymentDialog");
+    const paymentClose = document.getElementById("paymentClose");
+    const payNowBtn = document.getElementById("payNowBtn");
+    const payOrderIdEl = document.getElementById("payOrderId");
+    const payTotalEl = document.getElementById("payTotal");
+    const paymentMsg = document.getElementById("paymentMsg");
+    const paySpinner = document.getElementById("paySpinner");
+
+    // Result popup
+    const resultDialog = document.getElementById("resultDialog");
+    const resultClose = document.getElementById("resultClose");
+    const resultOk = document.getElementById("resultOk");
+    const resultTitle = document.getElementById("resultTitle");
+    const resultText = document.getElementById("resultText");
+
+
     // =========================
-    // Helpers
+    // State helpers
     // =========================
-    let allProducts = [];
-    let categories = [];
-
-    const fmtPrice = (value) => {
-      try {
-        return new Intl.NumberFormat("de-DE", { style:"currency", currency:"EUR" }).format(Number(value));
-      } catch {
-        return `${value} €`;
-      }
-    };
-
-    const safeText = (v, fallback="") => (v === null || v === undefined || v === "") ? fallback : String(v);
-
-    function buildImageUrl(imageUrl) {
-      // DB stores "/images/xxx.jpg"
-      if (!imageUrl) return "";
-      if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) return imageUrl;
-      return `${PRODUCT_API_BASE}${imageUrl}`;
-    }
-
     function setState(message, isError=false) {
       grid.innerHTML = `<div class="state ${isError ? "error":""}">${message}</div>`;
     }
@@ -535,16 +617,14 @@
               <span>Stock: <b style="color:var(--text)">${safeText(p.stock, "-")}</b></span>
               <span class="muted">${safeText(p.brand, "")}</span>
             </div>
-            <button class="btn accent add-cart-btn" data-id="${p.id}">
-              Add to Cart
-            </button>
+            <button class="btn accent add-cart-btn" data-id="${p.id}">Add to Cart</button>
           </div>
         `;
 
         card.addEventListener("click", (e) => {
-              if (e.target.closest(".add-cart-btn")) return; // ✅ butonsa detail açma
-              openDetails(p);
-            });
+          if (e.target.closest(".add-cart-btn")) return;
+          openDetails(p);
+        });
 
         grid.appendChild(card);
       });
@@ -566,7 +646,6 @@
       dId.textContent = safeText(p.id, "-");
 
       openImg.href = imgSrc;
-
       dlg.showModal();
     }
 
@@ -633,13 +712,10 @@
           throw new Error(`Register failed: HTTP ${res.status} - ${txt}`);
         }
 
-        const data = await res.json(); // AuthResponse
+        const data = await res.json();
         if (data?.accessToken) setToken(data.accessToken);
 
-       setUser({
-        email: data.email,
-        role: data.role
-        });
+        setUser({ email: data.email, role: data.role });
 
         refreshAuthUI();
         showAuthMsg("Registered successfully. Token received.", false);
@@ -669,17 +745,15 @@
           throw new Error(`Login failed: HTTP ${res.status} - ${txt}`);
         }
 
-        const data = await res.json(); // AuthResponse
+        const data = await res.json();
         if (data?.accessToken) setToken(data.accessToken);
 
-        setUser({
-        email: data.email,
-        role: data.role
-        });
+        setUser({ email: data.email, role: data.role });
 
         refreshAuthUI();
         showAuthMsg("Logged in successfully. Token received.", false);
         authDialog.close();
+        await refreshCart();
       } catch (e) {
         showAuthMsg(String(e), true);
       }
@@ -694,14 +768,14 @@
         const res = await fetch(PRODUCT_LIST_ENDPOINT);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-        await refreshCart();
-
         const data = await res.json();
         allProducts = Array.isArray(data) ? data : [];
 
         categories = [...new Set(allProducts.map(p => p.category).filter(Boolean))].sort();
         renderCategories();
         renderGrid();
+
+        await refreshCart();
       } catch (err) {
         setState(
           `Could not load products.<br><br>
@@ -717,53 +791,42 @@
     categorySelect.addEventListener("change", renderGrid);
     reloadBtn.addEventListener("click", loadProducts);
 
+    // =========================
+    // Add to cart
+    // =========================
+    document.addEventListener("click", async (e) => {
+      if (!e.target.classList.contains("add-cart-btn")) return;
+      e.stopPropagation();
 
-        document.addEventListener("click", async (e) => {
-          if (!e.target.classList.contains("add-cart-btn")) return;
+      const productId = e.target.dataset.id;
+      const token = getToken();
 
-            e.stopPropagation();
+      if (!token) {
+        alert("Please login first to add items to cart.");
+        return;
+      }
 
-          const productId = e.target.dataset.id;
-          const token = getToken();
-
-          if (!token) {
-            alert("Please login first to add items to cart.");
-            return;
-          }
-
-          try {
-            const res = await fetch(CART_ADD_ENDPOINT, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}`
-              },
-              body: JSON.stringify({
-                productId: Number(productId),
-                quantity: 1
-              })
-            });
-
-            if (!res.ok) {
-              throw new Error(`HTTP ${res.status}`);
-            }
-            await refreshCart();
-            alert("Product added to cart ✔");
-          } catch (err) {
-            alert("Error adding to cart: " + err);
-          }
+      try {
+        const res = await fetch(CART_ADD_ENDPOINT, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({ productId: Number(productId), quantity: 1 })
         });
 
-    // Cart UI elements
-    const openCart = document.getElementById("openCart");
-    const cartDialog = document.getElementById("cartDialog");
-    const cartClose = document.getElementById("cartClose");
-    const cartList = document.getElementById("cartList");
-    const cartCount = document.getElementById("cartCount");
-    const clearCartBtn = document.getElementById("clearCartBtn");
-    const cartTotal = document.getElementById("cartTotal");
-    const cartMsg = document.getElementById("cartMsg");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        await refreshCart();
+        alert("Product added to cart ✔");
+      } catch (err) {
+        alert("Error adding to cart: " + err);
+      }
+    });
 
+    // =========================
+    // Cart
+    // =========================
     function showCartMsg(text, isError=false){
       cartMsg.style.display = "inline-block";
       cartMsg.textContent = text;
@@ -779,7 +842,7 @@
         headers: { "Authorization": `Bearer ${token}` }
       });
       if(!res.ok) throw new Error(`Cart list failed: HTTP ${res.status}`);
-      return await res.json(); // List<CartItemDto>
+      return await res.json();
     }
 
     function calcTotal(items){
@@ -837,246 +900,428 @@
     }
 
     openCart.addEventListener("click", async () => {
-  if(!getToken()){
-    alert("Please login first to view cart.");
-    return;
-  }
-  await refreshCart();
-  cartDialog.showModal();
-});
-
-cartClose.addEventListener("click", () => cartDialog.close());
-
-clearCartBtn.addEventListener("click", async () => {
-  try{
-    const token = getToken();
-    const res = await fetch(CART_CLEAR_ENDPOINT, {
-      method:"DELETE",
-      headers: { "Authorization": `Bearer ${token}` }
-    });
-    if(!res.ok) throw new Error(`Clear failed: HTTP ${res.status}`);
-    await refreshCart();
-  } catch(e){
-    showCartMsg(String(e), true);
-  }
-});
-
-// Handle + / - and Remove inside cart dialog
-cartList.addEventListener("click", async (e) => {
-  const token = getToken();
-  if(!token) return;
-
-  const qtyBtn = e.target.closest(".qty-btn");
-  const removeBtn = e.target.closest(".remove-btn");
-
-  try{
-    if(qtyBtn){
-      const productId = Number(qtyBtn.dataset.id);
-      const action = qtyBtn.dataset.action; // INCREMENT/DECREMENT
-
-      const res = await fetch(CART_UPDATE_ENDPOINT(productId), {
-        method:"PUT",
-        headers: {
-          "Content-Type":"application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ updateAction: action })
-      });
-
-      if(!res.ok) throw new Error(`Update failed: HTTP ${res.status}`);
+      if(!getToken()){
+        alert("Please login first to view cart.");
+        return;
+      }
       await refreshCart();
-      return;
+      cartDialog.showModal();
+    });
+
+    cartClose.addEventListener("click", () => cartDialog.close());
+
+    clearCartBtn.addEventListener("click", async () => {
+      try{
+        const token = getToken();
+        const res = await fetch(CART_CLEAR_ENDPOINT, {
+          method:"DELETE",
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        if(!res.ok) throw new Error(`Clear failed: HTTP ${res.status}`);
+        await refreshCart();
+      } catch(e){
+        showCartMsg(String(e), true);
+      }
+    });
+
+    cartList.addEventListener("click", async (e) => {
+      const token = getToken();
+      if(!token) return;
+
+      const qtyBtn = e.target.closest(".qty-btn");
+      const removeBtn = e.target.closest(".remove-btn");
+
+      try{
+        if(qtyBtn){
+          const productId = Number(qtyBtn.dataset.id);
+          const action = qtyBtn.dataset.action; // INCREMENT/DECREMENT
+
+          const res = await fetch(CART_UPDATE_ENDPOINT(productId), {
+            method:"PUT",
+            headers: {
+              "Content-Type":"application/json",
+              "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({ updateAction: action })
+          });
+
+          if(!res.ok) throw new Error(`Update failed: HTTP ${res.status}`);
+          await refreshCart();
+          return;
+        }
+
+        if(removeBtn){
+          const productId = Number(removeBtn.dataset.id);
+          const res = await fetch(CART_DELETE_ENDPOINT(productId), {
+            method:"DELETE",
+            headers: { "Authorization": `Bearer ${token}` }
+          });
+          if(!res.ok) throw new Error(`Remove failed: HTTP ${res.status}`);
+          await refreshCart();
+        }
+      } catch(err){
+        showCartMsg(String(err), true);
+      }
+    });
+
+    // =========================
+    // Orders
+    // =========================
+    function showOrdersMsg(text, isError=false){
+      ordersMsg.style.display = "inline-block";
+      ordersMsg.textContent = text;
+      ordersMsg.style.borderColor = isError ? "rgba(255,120,120,.35)" : "rgba(255,255,255,.12)";
+      ordersMsg.style.color = isError ? "rgba(255,200,200,.92)" : "var(--muted)";
     }
 
-    if(removeBtn){
-      const productId = Number(removeBtn.dataset.id);
-      const res = await fetch(CART_DELETE_ENDPOINT(productId), {
-        method:"DELETE",
+    async function fetchOrders(){
+      const token = getToken();
+      if(!token) return [];
+      const res = await fetch(ORDER_LIST_ENDPOINT, {
         headers: { "Authorization": `Bearer ${token}` }
       });
-      if(!res.ok) throw new Error(`Remove failed: HTTP ${res.status}`);
-      await refreshCart();
-      return;
-    }
-  } catch(err){
-    showCartMsg(String(err), true);
-  }
-});
-
-// =========================
-// Orders UI
-// =========================
-const openOrders = document.getElementById("openOrders");
-const ordersDialog = document.getElementById("ordersDialog");
-const ordersClose = document.getElementById("ordersClose");
-const ordersList = document.getElementById("ordersList");
-const ordersMsg = document.getElementById("ordersMsg");
-const ordersCount = document.getElementById("ordersCount");
-const checkoutBtn = document.getElementById("checkoutBtn");
-
-function showOrdersMsg(text, isError=false){
-  ordersMsg.style.display = "inline-block";
-  ordersMsg.textContent = text;
-  ordersMsg.style.borderColor = isError ? "rgba(255,120,120,.35)" : "rgba(255,255,255,.12)";
-  ordersMsg.style.color = isError ? "rgba(255,200,200,.92)" : "var(--muted)";
-}
-
-async function fetchOrders(){
-  const token = getToken();
-  if(!token) return [];
-  const res = await fetch(ORDER_LIST_ENDPOINT, {
-    headers: { "Authorization": `Bearer ${token}` }
-  });
-  if(!res.ok) throw new Error(`Orders failed: HTTP ${res.status}`);
-  return await res.json(); // List<OrderResponseDto>
-}
-
-async function fetchOrderItems(orderId){
-  const token = getToken();
-  const res = await fetch(ORDER_DETAIL_ENDPOINT(orderId), {
-    headers: { "Authorization": `Bearer ${token}` }
-  });
-  if(!res.ok) throw new Error(`Order detail failed: HTTP ${res.status}`);
-  return await res.json(); // List<OrderItem> (senin endpoint böyle dönüyor)
-}
-
-function renderOrders(orders){
-  ordersCount.textContent = String(orders.length);
-
-  if(!orders.length){
-    ordersList.innerHTML = `<div class="state">No orders yet.</div>`;
-    return;
-  }
-
-  const html = orders.map(o => `
-    <div style="padding:12px 0; border-bottom:1px solid rgba(255,255,255,.06);">
-      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
-        <div style="font-weight:800;">
-          Order #${o.orderId}
-          <span class="pill" style="margin-left:10px;">${o.status}</span>
-        </div>
-        <div class="pill">${fmtPrice(o.totalAmount)}</div>
-      </div>
-
-      <div class="muted" style="margin-top:6px; display:flex; justify-content:space-between; gap:10px;">
-        <div>Items: ${(o.items || []).length}</div>
-        <button class="btn" data-action="DETAIL" data-id="${o.orderId}">Details</button>
-      </div>
-
-      <div id="orderItems-${o.orderId}" style="display:none; margin-top:8px;"></div>
-    </div>
-  `).join("");
-
-  ordersList.innerHTML = html;
-}
-
-async function refreshOrders(){
-  try{
-    const orders = await fetchOrders();
-    renderOrders(orders);
-  } catch(e){
-    showOrdersMsg(String(e), true);
-  }
-}
-
-openOrders.addEventListener("click", async () => {
-  if(!getToken()){
-    alert("Please login first to view orders.");
-    return;
-  }
-  await refreshOrders();
-  ordersDialog.showModal();
-});
-
-ordersClose.addEventListener("click", () => ordersDialog.close());
-
-ordersList.addEventListener("click", async (e) => {
-  const btn = e.target.closest("button[data-action='DETAIL']");
-  if(!btn) return;
-
-  const orderId = Number(btn.dataset.id);
-  const box = document.getElementById(`orderItems-${orderId}`);
-
-  // toggle
-  if(box.style.display === "block"){
-    box.style.display = "none";
-    box.innerHTML = "";
-    btn.textContent = "Details";
-    return;
-  }
-
-  try{
-    btn.textContent = "Loading...";
-    const items = await fetchOrderItems(orderId);
-
-    if(!items.length){
-      box.innerHTML = `<div class="state">No items found for this order.</div>`;
-    } else {
-      box.innerHTML = items.map(it => `
-        <div style="display:flex; justify-content:space-between; gap:10px; padding:6px 0;">
-          <div style="min-width:0;">
-            <div style="font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-              ${safeText(it.productName, "Unknown")}
-            </div>
-            <div class="muted" style="font-size:12px;">
-              ${fmtPrice(it.unitPrice)} × ${it.quantity} · productId: ${it.productId}
-            </div>
-          </div>
-          <div class="pill">
-            ${fmtPrice(Number(it.unitPrice) * Number(it.quantity))}
-          </div>
-        </div>
-      `).join("");
+      if(!res.ok) throw new Error(`Orders failed: HTTP ${res.status}`);
+      return await res.json();
     }
 
-    box.style.display = "block";
-    btn.textContent = "Hide";
-  } catch(err){
-    btn.textContent = "Details";
-    showOrdersMsg(String(err), true);
-  }
-});
+    async function fetchOrderItems(orderId){
+      const token = getToken();
+      const res = await fetch(ORDER_DETAIL_ENDPOINT(orderId), {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if(!res.ok) throw new Error(`Order detail failed: HTTP ${res.status}`);
+      return await res.json();
+    }
 
-// =========================
-// Checkout button (Cart -> Order)
-// =========================
-checkoutBtn.addEventListener("click", async () => {
+    function renderOrders(orders){
+      ordersCount.textContent = String(orders.length);
+
+      if(!orders.length){
+        ordersList.innerHTML = `<div class="state">No orders yet.</div>`;
+        return;
+      }
+
+      ordersList.innerHTML = orders.map(o => {
+        const canPay = (o.status === "CREATED");
+        return `
+          <div style="padding:12px 0; border-bottom:1px solid rgba(255,255,255,.06);">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+              <div style="font-weight:800;">
+                Order #${o.orderId}
+                <span class="pill" style="margin-left:10px;">${o.status}</span>
+              </div>
+              <div class="pill">${fmtPrice(o.totalAmount)}</div>
+            </div>
+
+            <div class="muted" style="margin-top:6px; display:flex; justify-content:space-between; gap:10px; align-items:center;">
+              <div>Items: ${(o.items || []).length}</div>
+
+              <div style="display:flex; gap:8px;">
+                ${canPay ? `<button class="btn accent" data-action="PAY" data-id="${o.orderId}" data-total="${o.totalAmount}">Pay</button>` : ``}
+                <button class="btn" data-action="DETAIL" data-id="${o.orderId}">Details</button>
+              </div>
+            </div>
+
+            <div id="orderItems-${o.orderId}" style="display:none; margin-top:8px;"></div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    async function refreshOrders(){
+      try{
+        const orders = await fetchOrders();
+        renderOrders(orders);
+      } catch(e){
+        showOrdersMsg(String(e), true);
+      }
+    }
+
+    openOrders.addEventListener("click", async () => {
+      if(!getToken()){
+        alert("Please login first to view orders.");
+        return;
+      }
+      await refreshOrders();
+      ordersDialog.showModal();
+    });
+
+    ordersClose.addEventListener("click", () => ordersDialog.close());
+
+    // ✅ Orders actions: PAY + DETAIL
+    ordersList.addEventListener("click", async (e) => {
+      const payBtn = e.target.closest("button[data-action='PAY']");
+      if(payBtn){
+        const orderId = Number(payBtn.dataset.id);
+        const total = Number(payBtn.dataset.total);
+        openPayment(orderId, total);
+        return;
+      }
+
+      const detailBtn = e.target.closest("button[data-action='DETAIL']");
+      if(!detailBtn) return;
+
+      const orderId = Number(detailBtn.dataset.id);
+      const box = document.getElementById(`orderItems-${orderId}`);
+
+      if(box.style.display === "block"){
+        box.style.display = "none";
+        box.innerHTML = "";
+        detailBtn.textContent = "Details";
+        return;
+      }
+
+      try{
+        detailBtn.textContent = "Loading...";
+        const items = await fetchOrderItems(orderId);
+
+        if(!items.length){
+          box.innerHTML = `<div class="state">No items found for this order.</div>`;
+        } else {
+          box.innerHTML = items.map(it => `
+            <div style="display:flex; justify-content:space-between; gap:10px; padding:6px 0;">
+              <div style="min-width:0;">
+                <div style="font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                  ${safeText(it.productName, "Unknown")}
+                </div>
+                <div class="muted" style="font-size:12px;">
+                  ${fmtPrice(it.unitPrice)} × ${it.quantity} · productId: ${it.productId}
+                </div>
+              </div>
+              <div class="pill">${fmtPrice(Number(it.unitPrice) * Number(it.quantity))}</div>
+            </div>
+          `).join("");
+        }
+
+        box.style.display = "block";
+        detailBtn.textContent = "Hide";
+      } catch(err){
+        detailBtn.textContent = "Details";
+        showOrdersMsg(String(err), true);
+      }
+    });
+
+    // =========================
+    // Payment dialog logic
+    // =========================
+    let currentPayOrderId = null;
+
+    function showPaymentMsg(text, isError=false){
+      paymentMsg.style.display = "inline-block";
+      paymentMsg.textContent = text;
+      paymentMsg.style.borderColor = isError ? "rgba(255,120,120,.35)" : "rgba(255,255,255,.12)";
+      paymentMsg.style.color = isError ? "rgba(255,200,200,.92)" : "var(--muted)";
+    }
+
+    function resetPaymentDialog(){
+      currentPayOrderId = null;
+      payOrderIdEl.textContent = "-";
+      payTotalEl.textContent = "-";
+      payNowBtn.disabled = true;
+      paymentMsg.style.display = "none";
+      paySpinner.style.display = "none";
+      document.querySelectorAll("input[name='payMethod']").forEach(r => r.checked = false);
+    }
+
+    function openPayment(orderId, totalAmount){
+      resetPaymentDialog();
+      currentPayOrderId = orderId;
+      payOrderIdEl.textContent = String(orderId);
+      payTotalEl.textContent = fmtPrice(totalAmount);
+      paymentDialog.showModal();
+    }
+
+    paymentClose.addEventListener("click", () => paymentDialog.close());
+    paymentDialog.addEventListener("close", resetPaymentDialog);
+
+    document.addEventListener("change", (e) => {
+      if (e.target && e.target.name === "payMethod") {
+        payNowBtn.disabled = false;
+      }
+    });
+
+    async function findOrderById(orderId){
+      const orders = await fetchOrders();
+      return orders.find(o => Number(o.orderId) === Number(orderId));
+    }
+
+payNowBtn.addEventListener("click", async () => {
   const token = getToken();
-  if(!token){
+  if (!token) {
     alert("Please login first.");
     return;
   }
 
-  try{
-    showCartMsg("Checking out...");
-    const res = await fetch(ORDER_CHECKOUT_ENDPOINT, {
-      method:"POST",
+  const selected = document.querySelector("input[name='payMethod']:checked");
+  if (!selected) {
+    showPaymentMsg("Please select a payment method.", true);
+    return;
+  }
+
+  try {
+    payNowBtn.disabled = true;
+    paySpinner.style.display = "inline-block";
+    showPaymentMsg("💳 Payment is processing… Please wait.", false);
+
+    // 1️⃣ Payment start
+    const body = {
+      orderId: Number(currentPayOrderId),
+      paymentMethode: selected.value
+    };
+
+    const res = await fetch(PAYMENT_START_ENDPOINT, {
+      method: "POST",
       headers: {
+        "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`
-      }
+      },
+      body: JSON.stringify(body)
     });
 
-    if(!res.ok){
+    if (!res.ok) {
       const txt = await res.text();
-      throw new Error(`Checkout failed: HTTP ${res.status} - ${txt}`);
+      throw new Error(`Payment start failed: ${txt}`);
     }
 
-    const data = await res.json(); // { orderId: ... }
-    showCartMsg(`✅ Order created. OrderId: ${data.orderId}`, false);
+    // 2️⃣ ŞİMDİ BEKLE VE ORDER STATUS'U KONTROL ET
+    const updated = await waitForOrderFinalStatus(currentPayOrderId, 15000);
+    paySpinner.style.display = "none";
 
-    // Cart temizleniyor (backend zaten clear yapıyor), UI güncelle
-    await refreshCart();
-    await refreshOrders(); // orders badge güncellensin
-  } catch(e){
-    showCartMsg(String(e), true);
+    if (!updated) {
+      showPaymentMsg(
+        "⏳ Payment processed, but status update is taking longer than expected. Please check your orders.",
+        true
+      );
+      return;
+    }
+
+        paySpinner.style.display = "none";
+        paymentDialog.close();
+
+
+    // 3️⃣ SONUCU GÖSTER
+    if (updated.status === "PAID") {
+      openResultPopup(
+        "✅ Payment successful",
+        `Payment received. Your order is being prepared. OrderId: ${updated.orderId}`
+      );
+    } else {
+      openResultPopup(
+        "❌ Payment failed",
+        `Payment failed. Please try again. OrderId: ${updated.orderId}`
+      );
+    }
+
+
+    // 4️⃣ Orders ekranını güncelle
+    await refreshOrders();
+
+  } catch (e) {
+    paySpinner.style.display = "none";
+    showPaymentMsg(String(e), true);
+  } finally {
+    payNowBtn.disabled = false;
   }
 });
 
-console.log(getToken());
 
-    // init
+    // =========================
+    // Checkout (Cart -> Order) + auto open payment
+    // =========================
+    checkoutBtn.addEventListener("click", async () => {
+      const token = getToken();
+      if(!token){
+        alert("Please login first.");
+        return;
+      }
+
+      try{
+        showCartMsg("Checking out...");
+        const res = await fetch(ORDER_CHECKOUT_ENDPOINT, {
+          method:"POST",
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        if(!res.ok){
+          const txt = await res.text();
+          throw new Error(`Checkout failed: HTTP ${res.status} - ${txt}`);
+        }
+
+        const data = await res.json(); // { orderId: ... }
+        showCartMsg(`✅ Order created. OrderId: ${data.orderId}`, false);
+
+        await refreshCart();
+        await refreshOrders();
+
+        const created = await findOrderById(data.orderId);
+        if(created){
+          openPayment(created.orderId, created.totalAmount);
+        } else {
+          openPayment(data.orderId, 0);
+        }
+
+      } catch(e){
+        showCartMsg(String(e), true);
+      }
+    });
+
+    async function waitForOrderFinalStatus(orderId, timeoutMs = 15000) {
+  const start = Date.now();
+
+  while (Date.now() - start < timeoutMs) {
+    const updated = await findOrderById(orderId);
+
+    if (updated && (updated.status === "PAID" || updated.status === "FAILED")) {
+      return updated;
+    }
+
+    await new Promise(r => setTimeout(r, 1000)); // 1 saniye bekle
+  }
+
+  return null; // timeout
+}
+
+    function openResultPopup(title, text){
+      resultTitle.textContent = title;
+      resultText.textContent = text;
+      resultDialog.showModal();
+    }
+
+      function forceCloseDialog(dlgEl){
+      if(!dlgEl) return;
+      try {
+        if (dlgEl.open) dlgEl.close();
+      } catch {}
+    }
+    function goHomeAfterResult(){
+      // ✅ her şeyi kapat
+      forceCloseDialog(paymentDialog);
+      forceCloseDialog(ordersDialog);
+      forceCloseDialog(cartDialog);
+      forceCloseDialog(resultDialog);
+
+      // ✅ anasayfa hissi
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    resultClose.addEventListener("click", () => {
+      resultDialog.close();
+      goHomeAfterResult();
+    });
+
+    resultOk.addEventListener("click", () => {
+      resultDialog.close();
+      goHomeAfterResult();
+    });
+
+    resultDialog.addEventListener("close", goHomeAfterResult);
+
+    // =========================
+    // Init
+    // =========================
     refreshAuthUI();
     loadProducts();
 </script>
+
 </body>
 </html>

@@ -4,6 +4,8 @@ import com.ecommerce.cart.model.*;
 import com.ecommerce.cart.repository.CartRepository;
 import com.ecommerce.cart.service.CartService;
 import jakarta.transaction.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.stereotype.Service;
@@ -19,6 +21,7 @@ public class CartServiceImpl  implements CartService {
 
     private final WebClient webClient;
     private final CartRepository repository;
+    private final static Logger LOGGER= LoggerFactory.getLogger(CartServiceImpl.class);
 
     @Value("${product.service.url}")
     private String PRODUCT_URL;
@@ -36,6 +39,7 @@ public class CartServiceImpl  implements CartService {
             CartItem cartItem= isThereSameCart.get();
             cartItem.setQuantity(cartItem.getQuantity()+ addToCartRequest.getQuantity());
             repository.save(cartItem);
+            LOGGER.info(String.format("Product added to cart productId: ->%s", cartItem.getProductId()));
         }else{
             Long productId= addToCartRequest.getProductId();
             BigDecimal price=getPriceById(productId);
@@ -45,6 +49,7 @@ public class CartServiceImpl  implements CartService {
             item.setProductId(productId);
             item.setPriceSnapshot(price);
             repository.save(item);
+            LOGGER.info(String.format("Product added to cart productId: ->%s", item.getProductId()));
         }
 
    }
@@ -101,6 +106,7 @@ public class CartServiceImpl  implements CartService {
         CartItem cartItem=repository.findByUserIdAndProductId(userId, productId)
                 .orElseThrow(()-> new RuntimeException("Cart item not found"));
         repository.delete(cartItem);
+        LOGGER.info(String.format("Product removed from cart productId: ->%s", productId));
     }
 
     // delete all cart items by user id
@@ -108,6 +114,7 @@ public class CartServiceImpl  implements CartService {
     @Override
     public void cartClear(Long userId) {
         repository.deleteByUserId(userId);
+        LOGGER.info(String.format("Cart cleared userID: ->%s", userId));
     }
 
     // update quantity

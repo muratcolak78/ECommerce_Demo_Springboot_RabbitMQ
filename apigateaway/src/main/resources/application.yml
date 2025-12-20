@@ -35,6 +35,10 @@ spring:
               uri: http://localhost:8084
               predicates:
                 - Path=/api/ecommerce/order/**
+            - id: payment-service
+              uri: http://localhost:8085
+              predicates:
+                - Path=/api/ecommerce/payment/**
             - id: images
               uri: http://localhost:8081
               predicates:
