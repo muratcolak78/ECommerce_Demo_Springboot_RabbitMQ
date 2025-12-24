@@ -3,7 +3,7 @@ package com.ecommerce.payment.service.impl;
 
 import com.ecommerce.payment.kafka.PaymentEventProducer;
 import com.ecommerce.payment.model.Payment;
-import com.ecommerce.payment.model.dto.PaymentEvent;
+import com.ecommerce.payment.model.event.PaymentEvent;
 import com.ecommerce.payment.model.dto.PaymentRequest;
 import com.ecommerce.payment.model.enums.EventStatus;
 import com.ecommerce.payment.model.enums.PaymentStatus;
@@ -12,7 +12,6 @@ import com.ecommerce.payment.service.PaymentService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -23,7 +22,7 @@ import java.math.BigDecimal;
 public class PaymentServiceImpl implements PaymentService {
     private final PaymentRepository repository;
     private final WebClient webClient;
-    private final PaymentEventProducer producer;
+    private final PaymentEventProducer paymentEventProducer;
     private final static Logger LOGGER= LoggerFactory.getLogger(PaymentServiceImpl.class);
 
     @Value("${order.service.url}")
@@ -32,7 +31,7 @@ public class PaymentServiceImpl implements PaymentService {
     public PaymentServiceImpl(PaymentRepository repository, WebClient webClient, PaymentEventProducer producer) {
         this.repository = repository;
         this.webClient = webClient;
-        this.producer = producer;
+        this.paymentEventProducer = producer;
     }
 
     @Override
@@ -62,7 +61,8 @@ public class PaymentServiceImpl implements PaymentService {
         PaymentEvent event=new PaymentEvent();
         event.setOrderId(savedPayment.getOrderId());
         event.setStatus(success? EventStatus.PAID: EventStatus.FAILED);
-        producer.paymentEventSend(event);
+        paymentEventProducer.paymentEventSend(event);
+
         LOGGER.info(String.format("Payment event sendet to kafka -> %s", event));
 
 

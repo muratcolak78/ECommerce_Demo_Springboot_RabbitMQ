@@ -158,7 +158,7 @@ public class CartServiceImpl  implements CartService {
                         .scheme("http")
                         .host("localhost")
                         .port(8081)
-                        .path("/api/product/getName")
+                        .path("/api/ecommerce/product/getName")
                         .queryParam("ids", ids)
                         .build())
                 .retrieve()

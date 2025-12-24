@@ -21,6 +21,8 @@ public class ProductDTO {
     private String imageUrl;
 
     private Integer stock;
+    private String brand;
+    private  String description;
 
 
 }

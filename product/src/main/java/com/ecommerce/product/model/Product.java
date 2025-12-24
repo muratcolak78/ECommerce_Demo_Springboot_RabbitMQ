@@ -31,7 +31,6 @@ public class Product {
 
     private String imageUrl;
     private  String description;
-    private Integer stock;
     private String brand;
 
     @Column(nullable = false, updatable = false)

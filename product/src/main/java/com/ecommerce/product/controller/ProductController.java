@@ -12,7 +12,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
-@RequestMapping("api/product")
+@RequestMapping("api/ecommerce/product")
 public class ProductController {
     private final ProductService productService;
 
@@ -21,10 +21,6 @@ public class ProductController {
     }
 
 
-    @GetMapping("/productdtos")
-    public ResponseEntity<List<ProductDTO>> getProductDTOS() {
-        return ResponseEntity.ok(productService.getProductDTOS());
-    }
     @GetMapping
     public ResponseEntity<List<Product>> getProducts() {
         return ResponseEntity.ok(productService.getProducts());
@@ -43,5 +39,11 @@ public class ProductController {
     @GetMapping("/getName")
     public List<ProductBasisDto> getNames(@RequestParam List<Long> ids) {
         return productService.getNamesByIds(ids);
+    }
+
+    @PostMapping("/addproduct")
+    public ResponseEntity<Void> addProduct(@RequestBody ProductDTO productDTO){
+        productService.addProduct(productDTO);
+        return ResponseEntity.ok().build();
     }
 }

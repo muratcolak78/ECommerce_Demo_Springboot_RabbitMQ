@@ -1,6 +1,6 @@
 package com.ecommerce.order.kafka;
 
-import com.ecommerce.order.model.PaymentEvent;
+import com.ecommerce.order.model.event.PaymentEvent;
 import com.ecommerce.order.service.OrderService;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;

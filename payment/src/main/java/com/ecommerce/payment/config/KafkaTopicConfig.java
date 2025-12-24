@@ -16,4 +16,5 @@ public class KafkaTopicConfig {
                 .name("payment_event")
                 .build();
     }
+
 }

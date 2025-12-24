@@ -2,7 +2,7 @@ package com.ecommerce.order.service;
 
 
 import com.ecommerce.order.model.OrderItem;
-import com.ecommerce.order.model.PaymentEvent;
+import com.ecommerce.order.model.event.PaymentEvent;
 import com.ecommerce.order.model.dto.OrderResponseDto;
 
 import java.math.BigDecimal;

@@ -1,11 +1,15 @@
 package com.ecommerce.order.service.impl;
 
+import com.ecommerce.order.kafka.InventoryRemovalProducer;
+import com.ecommerce.order.kafka.InventoryReservedProducer;
 import com.ecommerce.order.model.*;
 import com.ecommerce.order.model.dto.CartItemDto;
 import com.ecommerce.order.model.dto.OrderItemResponseDto;
 import com.ecommerce.order.model.dto.OrderResponseDto;
 import com.ecommerce.order.model.enums.EventStatus;
 import com.ecommerce.order.model.enums.Status;
+import com.ecommerce.order.model.event.InventoryEvent;
+import com.ecommerce.order.model.event.PaymentEvent;
 import com.ecommerce.order.repository.OrderItemRepository;
 import com.ecommerce.order.repository.OrderRepository;
 import com.ecommerce.order.kafka.OrderEventProducer;
@@ -27,16 +31,20 @@ public class OrderServiceImpl implements OrderService {
     private final OrderItemRepository itemRepository;
     private final WebClient webClient;
     private final OrderEventProducer producer;
+    private final InventoryReservedProducer inventoryreservedProducer;
+    private final InventoryRemovalProducer inventoryRemovalProducer;
     private final static Logger LOGGER= LoggerFactory.getLogger(OrderServiceImpl.class);
 
     @Value("${cart.service.url}")
     private String CART_SERVICE_URL;
 
-    public OrderServiceImpl(OrderRepository repository, OrderItemRepository itemRepository, WebClient webClient, OrderEventProducer producer) {
+    public OrderServiceImpl(OrderRepository repository, OrderItemRepository itemRepository, WebClient webClient, OrderEventProducer producer, InventoryReservedProducer inventoryreservedProducer, InventoryRemovalProducer inventoryRemovalProducer) {
         this.orderRepository = repository;
         this.itemRepository = itemRepository;
         this.webClient = webClient;
         this.producer = producer;
+        this.inventoryreservedProducer = inventoryreservedProducer;
+        this.inventoryRemovalProducer = inventoryRemovalProducer;
     }
 
 
@@ -53,7 +61,7 @@ public class OrderServiceImpl implements OrderService {
         order.setStatus(Status.CREATED);
         order.setTotalAmount(getTotalAmount(items));
 
-        ///  save Orde to database
+        ///  save Order to database
         Order savedOrder = orderRepository.save(order);
 
         /// Save Order Items
@@ -64,6 +72,13 @@ public class OrderServiceImpl implements OrderService {
             orderItem.setProductName(cart.getProductName());
             orderItem.setUnitPrice(cart.getPriceSnapshot());
             orderItem.setQuantity(cart.getQuantity());
+
+            /// create inventory reserved event
+            InventoryEvent event=new InventoryEvent();
+            event.setProductId(orderItem.getProductId());
+            event.setAmount(orderItem.getQuantity());
+            ///  sent evenet to kafka topic
+            inventoryreservedProducer.sendInventoryEvent(event);
 
             itemRepository.save(orderItem);
         }
@@ -139,10 +154,33 @@ public class OrderServiceImpl implements OrderService {
         }
 
 
+
         orderRepository.save(order);
+        setInventoryRemoval(order);
         LOGGER.info(String.format("order status updated -> %s %s",order.getUserId(),order.getStatus().name()));
 
 
+    }
+
+    private void setInventoryRemoval(Order order) {
+
+        if(order.getStatus()!=Status.PAID) return;
+
+        List<OrderItem> orderItemList=itemRepository.findByOrderId(order.getId());
+        if(orderItemList.isEmpty()){
+            throw new IllegalStateException("OrderItems not found");
+        }
+
+
+        for (OrderItem orderItem : orderItemList) {
+            ///  create event
+            InventoryEvent event=new InventoryEvent();
+            event.setProductId(orderItem.getProductId());
+            event.setAmount(orderItem.getQuantity());
+            ///  send to kafka topic
+            inventoryRemovalProducer.sendInventoryRemovalEvent(event);
+
+        }
     }
 
     @Override

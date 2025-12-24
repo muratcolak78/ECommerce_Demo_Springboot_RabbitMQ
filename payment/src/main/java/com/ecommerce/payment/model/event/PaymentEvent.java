@@ -1,12 +1,13 @@
-package com.ecommerce.order.model;
+package com.ecommerce.payment.model.event;
 
-
-import com.ecommerce.order.model.enums.EventStatus;
+import com.ecommerce.payment.model.enums.EventStatus;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.ToString;
 
 @Getter
 @Setter
+@ToString
 public class PaymentEvent {
     private Long orderId;
     private EventStatus status;

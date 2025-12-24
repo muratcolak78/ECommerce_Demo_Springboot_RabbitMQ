@@ -15,4 +15,5 @@ public interface ProductService {
     BigDecimal getPriceById(Long id);
     String getNameById(Long id);
     List<ProductBasisDto> getNamesByIds(List<Long> ids);
+    void addProduct(ProductDTO productDTO);
 }
