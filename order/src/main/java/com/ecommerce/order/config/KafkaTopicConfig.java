@@ -21,5 +21,11 @@ public class KafkaTopicConfig {
                 .name("inventory_removal_event")
                 .build();
     }
+    @Bean
+    public NewTopic shippingEvent(){
+        return TopicBuilder
+                .name("shipping_event")
+                .build();
+    }
 
 }

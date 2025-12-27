@@ -1,18 +1,18 @@
 package com.ecommerce.order.service.impl;
 
+import com.ecommerce.events.inventory.InventoryEvent;
+import com.ecommerce.events.payment.EventStatus;
+import com.ecommerce.events.payment.PaymentEvent;
+import com.ecommerce.events.shipping.ShippingEvent;
+import com.ecommerce.events.shipping.ShippingItemEvent;
 import com.ecommerce.order.kafka.InventoryRemovalProducer;
 import com.ecommerce.order.kafka.InventoryReservedProducer;
+import com.ecommerce.order.kafka.ShippingEventProducer;
 import com.ecommerce.order.model.*;
-import com.ecommerce.order.model.dto.CartItemDto;
-import com.ecommerce.order.model.dto.OrderItemResponseDto;
-import com.ecommerce.order.model.dto.OrderResponseDto;
-import com.ecommerce.order.model.enums.EventStatus;
+import com.ecommerce.order.model.dto.*;
 import com.ecommerce.order.model.enums.Status;
-import com.ecommerce.order.model.event.InventoryEvent;
-import com.ecommerce.order.model.event.PaymentEvent;
 import com.ecommerce.order.repository.OrderItemRepository;
 import com.ecommerce.order.repository.OrderRepository;
-import com.ecommerce.order.kafka.OrderEventProducer;
 import com.ecommerce.order.service.OrderService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,39 +30,56 @@ public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository itemRepository;
     private final WebClient webClient;
-    private final OrderEventProducer producer;
     private final InventoryReservedProducer inventoryreservedProducer;
     private final InventoryRemovalProducer inventoryRemovalProducer;
+    private final ShippingEventProducer shippingEventProducer;
     private final static Logger LOGGER= LoggerFactory.getLogger(OrderServiceImpl.class);
 
     @Value("${cart.service.url}")
     private String CART_SERVICE_URL;
 
-    public OrderServiceImpl(OrderRepository repository, OrderItemRepository itemRepository, WebClient webClient, OrderEventProducer producer, InventoryReservedProducer inventoryreservedProducer, InventoryRemovalProducer inventoryRemovalProducer) {
+    public OrderServiceImpl(OrderRepository repository, OrderItemRepository itemRepository, WebClient webClient, InventoryReservedProducer inventoryreservedProducer, InventoryRemovalProducer inventoryRemovalProducer, ShippingEventProducer shippingEventProducer) {
         this.orderRepository = repository;
         this.itemRepository = itemRepository;
         this.webClient = webClient;
-        this.producer = producer;
         this.inventoryreservedProducer = inventoryreservedProducer;
         this.inventoryRemovalProducer = inventoryRemovalProducer;
+        this.shippingEventProducer = shippingEventProducer;
     }
 
 
     @Override
     @Transactional
-    public Long checkOut(Long userId, String header) {
+    public Long checkOut(Long userId, String header, CheckoutRequest request) {
         List<CartItemDto> items=getUsersCartItems(header);
         if (items.isEmpty()) {
             throw new IllegalStateException("Cart is empty");
         }
+        if (request.getDeliveryAddress() == null) {
+            throw new IllegalStateException("Delivery address is required");
+        }
+        if (request.getDeliveryAddress().getEmail() == null || request.getDeliveryAddress().getEmail().isBlank()) {
+            throw new IllegalStateException("Email is required");
+        }
+
         /// Create Order
         Order order = new Order();
         order.setUserId(userId);
         order.setStatus(Status.CREATED);
         order.setTotalAmount(getTotalAmount(items));
+        ///get and set address
+        DeliveryAddress address= request.getDeliveryAddress();
+        order.setShippingName(address.getFullName());
+        order.setShippingStreet(address.getStreet());
+        order.setShippingCity(address.getCity());
+        order.setShippingZip(address.getZip());
+        order.setShippingCountry(address.getCountry());
+        order.setShippingPhone(address.getPhone());
+        order.setEmail(address.getEmail());
 
         ///  save Order to database
         Order savedOrder = orderRepository.save(order);
+        LOGGER.info(String.format("order saved status: -> %s%s",order.getId(), order.getStatus()));
 
         /// Save Order Items
         for (CartItemDto cart : items) {
@@ -82,19 +99,10 @@ public class OrderServiceImpl implements OrderService {
 
             itemRepository.save(orderItem);
         }
-        /// create order_event to send kafka order_saved topic
-        OrderCreatedEvent event=new OrderCreatedEvent();
-        event.setOrderId(savedOrder.getId());
-        event.setUserId(savedOrder.getUserId());
-        event.setStatus(savedOrder.getStatus());
-        event.setTotalAmount(savedOrder.getTotalAmount());
-
-        /// send event
-       /// producer.publishOrderSaved(event);
-
-        /// Clear Cart
+        LOGGER.info(String.format(">>> Order items saved -> %s",savedOrder));
+             /// Clear Cart
         clearCart(header);
-        LOGGER.info(String.format("order saved -> %s",order));
+
         return savedOrder.getId();
 
     }
@@ -140,15 +148,23 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public void updateStatus(PaymentEvent paymentEvent) {
-        LOGGER.info(String.format("Message received from kafka topic ->%s", paymentEvent));
+        LOGGER.info(String.format(">>> PaymentEvent Message received from kafka topic ->%s", paymentEvent.getOrderId()));
         Order order=orderRepository.findById(paymentEvent.getOrderId())
                 .orElseThrow(()->new IllegalStateException("Order not found"));
 
         if (order.getStatus()!=Status.CREATED) return;
 
-        LOGGER.info(String.format("order status -> %s %s",order.getUserId(), order.getStatus().name()));
-        if(paymentEvent.getStatus()==EventStatus.PAID){
+        if(paymentEvent.getStatus()== EventStatus.PAID){
             order.setStatus(Status.PAID);
+            LOGGER.info(String.format(">>> Order updated status:-> %s%s",order.getId(), order.getStatus()));
+
+            sendEventToInventoryToRemoveQuantity(order);
+
+            LOGGER.info(String.format(">>> InventoryEvent is sent to Kafka -> %s ",order.getUserId()));
+
+            sendEventToShippingToSaveOrderData(order);
+            LOGGER.info(String.format(">>> ShippingEvent is sent to Kafka -> %s ",order.getUserId()));
+
         }else if(paymentEvent.getStatus()==EventStatus.FAILED){
             order.setStatus(Status.FAILED);
         }
@@ -156,13 +172,42 @@ public class OrderServiceImpl implements OrderService {
 
 
         orderRepository.save(order);
-        setInventoryRemoval(order);
-        LOGGER.info(String.format("order status updated -> %s %s",order.getUserId(),order.getStatus().name()));
+
 
 
     }
 
-    private void setInventoryRemoval(Order order) {
+    private void sendEventToShippingToSaveOrderData(Order order) {
+            List<OrderItem> orderItemList=itemRepository.findByOrderId(order.getId());
+
+            if(orderItemList.isEmpty()) throw  new IllegalStateException("OrderItems not found");
+
+            ShippingEvent shippingEvent=new ShippingEvent();
+            shippingEvent.setOrderId(order.getId());
+            shippingEvent.setUserId(order.getUserId());
+            shippingEvent.setFullName(order.getShippingName());
+            shippingEvent.setStreet(order.getShippingStreet());
+            shippingEvent.setCity(order.getShippingCity());
+            shippingEvent.setZip(order.getShippingZip());
+            shippingEvent.setCountry(order.getShippingCountry());
+            shippingEvent.setPhone(order.getShippingPhone()==null?"00000": order.getShippingPhone());
+
+            for(OrderItem item:orderItemList){
+                ShippingItemEvent shippingItemEvent=new ShippingItemEvent();
+                shippingItemEvent.setProductId(item.getProductId());
+                shippingItemEvent.setProductName(item.getProductName());
+                shippingItemEvent.setQuantity(item.getQuantity());
+                shippingEvent.getShippingItemEventList().add(shippingItemEvent);
+
+            }
+
+            shippingEventProducer.sendShippingEvent(shippingEvent);
+
+
+    }
+
+
+    private void sendEventToInventoryToRemoveQuantity(Order order) {
 
         if(order.getStatus()!=Status.PAID) return;
 

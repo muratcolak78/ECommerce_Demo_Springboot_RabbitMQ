@@ -1,6 +1,6 @@
 package com.ecommerce.order.kafka;
 
-import com.ecommerce.order.model.event.InventoryEvent;
+import com.ecommerce.events.inventory.InventoryEvent;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 

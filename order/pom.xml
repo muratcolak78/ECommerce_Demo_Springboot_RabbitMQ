@@ -49,6 +49,7 @@
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
 			<optional>true</optional>
+
 		</dependency>
 
 		<dependency>
@@ -90,6 +91,11 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-kafka</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.ecommerce</groupId>
+			<artifactId>events</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
 		</dependency>
 
 

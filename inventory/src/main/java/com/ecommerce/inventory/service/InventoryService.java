@@ -1,8 +1,8 @@
 package com.ecommerce.inventory.service;
 
 
-import com.ecommerce.inventory.model.eventmodel.InventoryEvent;
-import com.ecommerce.inventory.model.eventmodel.ProductEvent;
+import com.ecommerce.events.inventory.InventoryEvent;
+import com.ecommerce.events.product.ProductEvent;
 
 import java.util.Map;
 

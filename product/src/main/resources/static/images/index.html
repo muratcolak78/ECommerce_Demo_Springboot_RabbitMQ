@@ -361,6 +361,35 @@
         <div id="ordersMsg" class="pill" style="margin-top:12px; display:none;"></div>
     </div>
 </dialog>
+<dialog id="addressDialog">
+    <div style="padding:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+            <div style="font-weight:800; font-size:18px;">Delivery Address</div>
+            <button class="close" id="addressClose">Close</button>
+        </div>
+
+        <div class="two-cols" style="margin-top:12px;">
+            <div>
+                <input id="aFullName" type="text" class="input" placeholder="Full name" style="width:100%; margin-bottom:8px;" required/>
+                <input id="aStreet" type="text" class="input" placeholder="Street" style="width:100%; margin-bottom:8px;" required/>
+                <input id="aZip" class="input" placeholder="ZIP" style="width:100%; margin-bottom:8px;" required/>
+            </div>
+            <div>
+                <input id="aCity" type="text" class="input" placeholder="City" style="width:100%; margin-bottom:8px;" required/>
+                <input id="aCountry" type="text" class="input" placeholder="Country" style="width:100%; margin-bottom:8px;" required/>
+                <input id="aEmail" type="email" class="input" placeholder="Email" style="width:100%; margin-bottom:8px;" required/>
+                <input id="aPhone" type="tel" class="input" placeholder="Phone (optional)" style="width:100%; margin-bottom:8px;" />
+
+
+            </div>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:12px; align-items:center;">
+            <button id="addressContinue" class="btn accent">Continue Checkout</button>
+            <span id="addressMsg" class="pill" style="display:none;"></span>
+        </div>
+    </div>
+</dialog>
 
 <dialog id="paymentDialog">
     <div style="padding:18px;">
@@ -552,6 +581,34 @@
     const paymentMsg = document.getElementById("paymentMsg");
     const paySpinner = document.getElementById("paySpinner");
 
+    // Address UI
+    const addressDialog = document.getElementById("addressDialog");
+    const addressClose = document.getElementById("addressClose");
+    const addressContinue = document.getElementById("addressContinue");
+    const addressMsg = document.getElementById("addressMsg");
+
+    const aFullName = document.getElementById("aFullName");
+    const aStreet = document.getElementById("aStreet");
+    const aZip = document.getElementById("aZip");
+    const aCity = document.getElementById("aCity");
+    const aCountry = document.getElementById("aCountry");
+    const aPhone = document.getElementById("aPhone");
+    const aEmail = document.getElementById("aEmail");
+
+
+   // const ADDRESS_KEY = "ecom_delivery_address";
+
+    function addressKey() {
+      // token varsa user bazlı key üret
+      const t = getToken();
+      if (!t) return "ecom_delivery_address__guest";
+      const payload = parseJwt(t); // sende zaten login sonrası userId çektiğin bir şey var; yoksa aşağıda vereceğim
+      const userId = payload?.userId || payload?.sub || "unknown";
+      return `ecom_delivery_address__${userId}`;
+    }
+
+
+
     // Result popup
     const resultDialog = document.getElementById("resultDialog");
     const resultClose = document.getElementById("resultClose");
@@ -563,6 +620,77 @@
     // =========================
     // State helpers
     // =========================
+
+    function showAddressMsg(text, isError=false){
+  addressMsg.style.display = "inline-block";
+  addressMsg.textContent = text;
+  addressMsg.style.borderColor = isError ? "rgba(255,120,120,.35)" : "rgba(255,255,255,.12)";
+  addressMsg.style.color = isError ? "rgba(255,200,200,.92)" : "var(--muted)";
+}
+
+function getSavedAddress(){
+  const raw = localStorage.getItem(addressKey());
+  return raw ? JSON.parse(raw) : null;
+}
+
+function setSavedAddress(addr){
+  localStorage.setItem(addressKey(), JSON.stringify(addr));
+}
+function clearSavedAddress(){
+  localStorage.removeItem(addressKey());
+}
+
+function fillAddressForm(addr){
+  if(!addr) return;
+  aFullName.value = addr.fullName || "";
+  aStreet.value   = addr.street || "";
+  aZip.value      = addr.zip || "";
+  aCity.value     = addr.city || "";
+  aCountry.value  = addr.country || "";
+  aPhone.value    = addr.phone || "";
+  aEmail.value    = addr.email || "";
+}
+
+function readAddressFromForm(){
+  return {
+    fullName: (aFullName.value || "").trim(),
+    street: (aStreet.value || "").trim(),
+    zip: (aZip.value || "").trim(),
+    city: (aCity.value || "").trim(),
+    country: (aCountry.value || "").trim(),
+    phone: (aPhone.value || "").trim(),
+    email: (aEmail.value || "").trim()
+  };
+}
+
+function validateAddress(addr){
+  if(!addr.fullName) return "Full name is required";
+  if(!addr.street) return "Street is required";
+  if(!addr.zip) return "ZIP is required";
+  if(!addr.city) return "City is required";
+  if(!addr.country) return "Country is required";
+  if(!addr.email) return "Email is required";
+
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addr.email);
+  if(!emailOk) return "Email format is invalid";
+  return null;
+}
+
+addressClose.addEventListener("click", () => addressDialog.close());
+addressDialog.addEventListener("close", () => { addressMsg.style.display = "none"; });
+
+function parseJwt(token) {
+  try {
+    const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = decodeURIComponent(atob(base64).split("").map(c => "%" + c.charCodeAt(0).toString(16).padStart(2,"0")).join(""));
+    return JSON.parse(json);
+  } catch(e) {
+    return null;
+  }
+}
+
+
+
     function setState(message, isError=false) {
       grid.innerHTML = `<div class="state ${isError ? "error":""}">${message}</div>`;
     }
@@ -688,6 +816,10 @@
       clearToken();
       clearUser();
       refreshAuthUI();
+      clearSavedAddress();
+        fillAddressForm({fullName:"", street:"", zip:"", city:"", country:"", phone:"", email:""});
+
+
       showAuthMsg("Logged out.", false);
     });
 
@@ -751,6 +883,7 @@
         setUser({ email: data.email, role: data.role });
 
         refreshAuthUI();
+        fillAddressForm(getSavedAddress());
         showAuthMsg("Logged in successfully. Token received.", false);
         authDialog.close();
         await refreshCart();
@@ -1229,41 +1362,87 @@ payNowBtn.addEventListener("click", async () => {
     // Checkout (Cart -> Order) + auto open payment
     // =========================
     checkoutBtn.addEventListener("click", async () => {
-      const token = getToken();
-      if(!token){
-        alert("Please login first.");
-        return;
-      }
+  const token = getToken();
+  if(!token){
+    alert("Please login first.");
+    return;
+  }
 
-      try{
-        showCartMsg("Checking out...");
-        const res = await fetch(ORDER_CHECKOUT_ENDPOINT, {
-          method:"POST",
-          headers: { "Authorization": `Bearer ${token}` }
-        });
+  // cart boşsa adres istemeyelim
+  try{
+    const items = await fetchCartItems();
+    if(!items.length){
+      showCartMsg("Cart is empty.", true);
+      return;
+    }
+  } catch(e){
+    showCartMsg(String(e), true);
+    return;
+  }
 
-        if(!res.ok){
-          const txt = await res.text();
-          throw new Error(`Checkout failed: HTTP ${res.status} - ${txt}`);
-        }
+  // formu doldur (varsa localStorage’dan)
+  fillAddressForm(getSavedAddress());
+  addressDialog.showModal();
+});
+addressContinue.addEventListener("click", async () => {
+  const token = getToken();
+  if(!token){
+    alert("Please login first.");
+    return;
+  }
 
-        const data = await res.json(); // { orderId: ... }
-        showCartMsg(`✅ Order created. OrderId: ${data.orderId}`, false);
+  const addr = readAddressFromForm();
+  const err = validateAddress(addr);
+  if(err){
+    showAddressMsg(err, true);
+    return;
+  }
 
-        await refreshCart();
-        await refreshOrders();
+  setSavedAddress(addr);
+  showAddressMsg("Creating order...", false);
 
-        const created = await findOrderById(data.orderId);
-        if(created){
-          openPayment(created.orderId, created.totalAmount);
-        } else {
-          openPayment(data.orderId, 0);
-        }
+  try{
+    // Order checkout request body
+    const checkoutBody = {
+      deliveryAddress: addr
+    };
 
-      } catch(e){
-        showCartMsg(String(e), true);
-      }
+    const res = await fetch(ORDER_CHECKOUT_ENDPOINT, {
+      method:"POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify(checkoutBody)
     });
+
+    if(!res.ok){
+      const txt = await res.text();
+      throw new Error(`Checkout failed: HTTP ${res.status} - ${txt}`);
+    }
+
+    const data = await res.json(); // { orderId: ... }
+
+    addressDialog.close();
+    cartDialog.close();
+
+    showCartMsg(`✅ Order created. OrderId: ${data.orderId}`, false);
+
+    await refreshCart();
+    await refreshOrders();
+
+    const created = await findOrderById(data.orderId);
+    if(created){
+      openPayment(created.orderId, created.totalAmount);
+    } else {
+      openPayment(data.orderId, 0);
+    }
+
+  } catch(e){
+    showAddressMsg(String(e), true);
+  }
+});
+
 
     async function waitForOrderFinalStatus(orderId, timeoutMs = 15000) {
   const start = Date.now();

@@ -1,7 +1,7 @@
 package com.ecommerce.inventory.kafka;
 
 
-import com.ecommerce.inventory.model.eventmodel.ProductEvent;
+import com.ecommerce.events.product.ProductEvent;
 import com.ecommerce.inventory.service.InventoryService;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
@@ -14,7 +14,7 @@ public class ProductEventConsumer {
         this.service = service;
     }
 
-    @KafkaListener(topics = "product_added_event", groupId = "mygroup")
+    @KafkaListener(topics = "product_added_event")
     public void productEventListener(ProductEvent event){
         service.addStock(event);
     }

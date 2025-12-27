@@ -1,8 +1,8 @@
 package com.ecommerce.inventory.service.impl;
 
+import com.ecommerce.events.inventory.InventoryEvent;
+import com.ecommerce.events.product.ProductEvent;
 import com.ecommerce.inventory.model.Inventory;
-import com.ecommerce.inventory.model.eventmodel.InventoryEvent;
-import com.ecommerce.inventory.model.eventmodel.ProductEvent;
 import com.ecommerce.inventory.repository.InventoryRepository;
 import com.ecommerce.inventory.service.InventoryService;
 import org.slf4j.Logger;
@@ -32,7 +32,7 @@ public class InvetoryServiceImpl implements InventoryService {
         inventory.setStock(event.getStock());
 
         repository.save(inventory);
-        LOGGER.info(String.format("Product inventory saved to database %s", inventory));
+        LOGGER.info(String.format(">>> ProductEvent received from Kafka  product id: %s", event.getProductId()));
 
     }
 
@@ -68,7 +68,7 @@ public class InvetoryServiceImpl implements InventoryService {
         inventory.setReserved(inventory.getReserved() + qty);
 
         repository.save(inventory);
-        LOGGER.info(String.format("Product inventory reserved to database %s", inventory));
+        LOGGER.info(String.format(">>> ReserveEvent message received product id: %s", event.getProductId()));
     }
 
     @Override
@@ -89,6 +89,6 @@ public class InvetoryServiceImpl implements InventoryService {
         inventory.setReserved(inventory.getReserved()-qty);
 
         repository.save(inventory);
-        LOGGER.info(String.format("Reserved amount removed rom inventory database %s", inventory));
+        LOGGER.info(String.format(">>> RemoveEvent message received product id: %s", event.getProductId()));
     }
 }

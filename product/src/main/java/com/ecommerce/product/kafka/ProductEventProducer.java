@@ -1,6 +1,6 @@
 package com.ecommerce.product.kafka;
 
-import com.ecommerce.product.model.eventmodel.ProductEvent;
+import com.ecommerce.events.product.ProductEvent;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 

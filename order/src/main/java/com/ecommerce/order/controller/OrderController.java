@@ -1,8 +1,10 @@
 package com.ecommerce.order.controller;
 
 import com.ecommerce.order.model.OrderItem;
+import com.ecommerce.order.model.dto.CheckoutRequest;
 import com.ecommerce.order.model.dto.OrderResponseDto;
 import com.ecommerce.order.service.OrderService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -23,15 +25,16 @@ public class OrderController {
     @PostMapping("/checkout")
     public ResponseEntity<Map<String, Long>> checkOut(
             Authentication authentication,
-            @RequestHeader("Authorization") String header                ){
+            @RequestHeader("Authorization") String header,
+            @Valid @RequestBody CheckoutRequest request){
         Long userId=Long.valueOf(authentication.getName());
-        Long orderId=service.checkOut(userId, header);
+        Long orderId=service.checkOut(userId, header, request);
         return  ResponseEntity.status(200).body(Map.of("orderId",orderId));
 
     }
 
     @GetMapping("/order/{orderId}")
-    public ResponseEntity< List<OrderItem>> getOrder(@PathVariable("orderId") Long orderId, Authentication authentication){
+    public ResponseEntity< List<OrderItem>> getOrderByUserIdAndOrderId(@PathVariable("orderId") Long orderId, Authentication authentication){
         Long userId=Long.valueOf(authentication.getName());
         List<OrderItem> orderItemList= service.findByUserId(orderId, userId);
         return ResponseEntity.ok(orderItemList);

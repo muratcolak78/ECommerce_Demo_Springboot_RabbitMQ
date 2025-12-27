@@ -1,11 +1,11 @@
 package com.ecommerce.payment.service.impl;
 
 
+import com.ecommerce.events.payment.EventStatus;
+import com.ecommerce.events.payment.PaymentEvent;
 import com.ecommerce.payment.kafka.PaymentEventProducer;
 import com.ecommerce.payment.model.Payment;
-import com.ecommerce.payment.model.event.PaymentEvent;
 import com.ecommerce.payment.model.dto.PaymentRequest;
-import com.ecommerce.payment.model.enums.EventStatus;
 import com.ecommerce.payment.model.enums.PaymentStatus;
 import com.ecommerce.payment.repository.PaymentRepository;
 import com.ecommerce.payment.service.PaymentService;
@@ -63,7 +63,7 @@ public class PaymentServiceImpl implements PaymentService {
         event.setStatus(success? EventStatus.PAID: EventStatus.FAILED);
         paymentEventProducer.paymentEventSend(event);
 
-        LOGGER.info(String.format("Payment event sendet to kafka -> %s", event));
+        LOGGER.info(String.format(">>> PaymentEvent is sent  to kafka -> %s", event.getOrderId()));
 
 
     }
