@@ -1,4 +1,9 @@
  E-Commerce Microservices Demo (Java Spring Boot + SQLite + JWT)
+
+shipping service added
+![shipping](https://github.com/user-attachments/assets/5296cf4f-6580-4981-8d89-1f2193debd91)
+
+
 inventory service added.
 
 architektonische Struktur
